@@ -10,7 +10,8 @@
 #include <vector>
 #include <string>
 #include <string_view>
-#include <print>
+#include <iostream>  // Replaced <print> for better compatibility
+#include <iomanip>   // Added for hex formatting
 #include <cctype>
 #include <algorithm>
 
@@ -386,24 +387,37 @@ inline vm_size_t get_total_code_size(task_t task, vm_address_t image_base) {
 inline void print_segments(task_t task, vm_address_t image_base) {
     auto segments = get_all_segments(task, image_base);
 
-    std::println("{:<16} {:>16} {:>16} {:>12}", "Segment", "Address", "End", "Size");
-    std::println("{:-<16} {:-<16} {:-<16} {:-<12}", "", "", "", "");
+    // Using standard iostreams instead of C++23 <print>
+    std::cout << std::left << std::setw(16) << "Segment" 
+              << std::right << std::setw(16) << "Address" 
+              << std::setw(16) << "End" 
+              << std::setw(12) << "Size" << std::endl;
+    
+    std::cout << std::setfill('-') << std::setw(60) << "" << std::setfill(' ') << std::endl;
 
     for (const auto& seg : segments) {
-        std::println("{:<16} 0x{:014X} 0x{:014X} 0x{:X}",
-                     seg.name, seg.address, seg.address + seg.size, seg.size);
+        std::cout << std::left << std::setw(16) << seg.name 
+                  << std::right << "0x" << std::hex << std::uppercase << std::setw(14) << std::setfill('0') << seg.address 
+                  << " 0x" << std::setw(14) << (seg.address + seg.size) 
+                  << " 0x" << std::setfill(' ') << std::hex << seg.size << std::dec << std::endl;
     }
 }
 
 inline void print_sections(task_t task, vm_address_t image_base) {
     auto sections = get_all_sections(task, image_base);
 
-    std::println("{:<16} {:<20} {:>16} {:>12}", "Segment", "Section", "Address", "Size");
-    std::println("{:-<16} {:-<20} {:-<16} {:-<12}", "", "", "", "");
+    std::cout << std::left << std::setw(16) << "Segment" 
+              << std::setw(20) << "Section" 
+              << std::right << std::setw(16) << "Address" 
+              << std::setw(12) << "Size" << std::endl;
+              
+    std::cout << std::setfill('-') << std::setw(64) << "" << std::setfill(' ') << std::endl;
 
     for (const auto& sect : sections) {
-        std::println("{:<16} {:<20} 0x{:014X} 0x{:X}",
-                     sect.segment_name, sect.section_name, sect.address, sect.size);
+        std::cout << std::left << std::setw(16) << sect.segment_name 
+                  << std::setw(20) << sect.section_name 
+                  << std::right << "0x" << std::hex << std::uppercase << std::setw(14) << std::setfill('0') << sect.address 
+                  << " 0x" << std::setfill(' ') << std::hex << sect.size << std::dec << std::endl;
     }
 }
 
