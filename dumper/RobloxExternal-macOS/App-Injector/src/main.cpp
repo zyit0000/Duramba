@@ -2,25 +2,31 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>
+#include <string>
 
-// Your project headers
-#include "src/memory/memory.hpp"
-#include "src/macho/macho.hpp"
-#include "src/scanner/scanner.hpp"
+// Correct relative paths based on your file tree
+#include "memory/memory.hpp"
+#include "macho/macho.hpp"
+#include "scanner/scanner.hpp"
 #include "roblox/offsets.hpp"
-#include "roblox/math.hpp"
-#include "roblox/string.hpp"
 
 namespace fs = std::filesystem;
 
-void save_print_offset(uintptr_t offset) {
+/** * Saves the found offset to ~/Documents/offsets.txt.
+ * Checks for existing entries to prevent duplicates.
+ */
+void save_to_local_file(uintptr_t offset) {
     const char* home = std::getenv("HOME");
     if (!home) return;
 
     fs::path doc_path = fs::path(home) / "Documents" / "offsets.txt";
-    std::string entry = "PRINT_FUNCTION = 0x" + std::to_string(offset);
+    std::string entry = "PRINT_FUNCTION = 0x";
+    
+    // Manually formatting hex for standalone compatibility
+    char hex_str[20];
+    snprintf(hex_str, sizeof(hex_str), "%lx", offset);
+    entry += hex_str;
 
-    // Check for duplicates before writing
     if (fs::exists(doc_path)) {
         std::ifstream infile(doc_path);
         std::string line;
@@ -32,54 +38,44 @@ void save_print_offset(uintptr_t offset) {
     std::ofstream outfile(doc_path, std::ios::app);
     if (outfile.is_open()) {
         outfile << entry << " (Found: " << __DATE__ << ")" << std::endl;
-        std::cout << "[+] Saved Print Offset to Documents/offsets.txt" << std::endl;
+        std::cout << "[+] Offset saved to Documents/offsets.txt" << std::endl;
     }
 }
 
+/** * Scans the target task memory for the Intel x86_64 Print signature.
+ */
 void find_print_offset(task_t task, vm_address_t image_base) {
-    std::cout << "--- Scanning for Print Function (Intel) ---" << std::endl;
-
-    // Intel x86_64 AOB Signature
-    const std::vector<uint8_t> print_sig = { 
+    // Intel x86_64 AOB for Print (push rbp; mov rbp, rsp...)
+    const std::vector<uint8_t> print_signature = { 
         0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53, 0x48, 0x81, 0xEC 
     };
 
-    // Use your project's macho utility to find the code section
+    // Locate __TEXT section using provided macho utility
     auto text_section = macho::get_section(task, image_base, "__TEXT", "__text");
-    if (!text_section) {
-        std::cout << "[-] Could not find __TEXT section" << std::endl;
-        return;
-    }
+    if (!text_section) return;
 
-    // Read the section using your project's memory utility
+    // Read bytes using provided memory utility
     std::vector<uint8_t> buffer(text_section->size);
-    if (!memory::read_bytes(task, text_section->address, buffer.data(), text_section->size)) {
-        std::cout << "[-] Failed to read __TEXT memory" << std::endl;
-        return;
-    }
+    if (!memory::read_bytes(task, text_section->address, buffer.data(), text_section->size)) return;
 
-    // Search for the pattern
-    for (size_t i = 0; i <= buffer.size() - print_sig.size(); ++i) {
-        if (std::memcmp(&buffer[i], print_sig.data(), print_sig.size()) == 0) {
-            uintptr_t absolute_addr = text_section->address + i;
-            uintptr_t relative_offset = absolute_addr - image_base;
-            
-            std::cout << "[+] Found Print at Offset: 0x" << std::hex << relative_offset << std::endl;
-            save_print_offset(relative_offset);
+    // Pattern match search
+    for (size_t i = 0; i <= buffer.size() - print_signature.size(); ++i) {
+        if (std::memcmp(&buffer[i], print_signature.data(), print_signature.size()) == 0) {
+            uintptr_t offset = (text_section->address + i) - image_base;
+            std::cout << "[+] Found Print Offset: 0x" << std::hex << offset << std::endl;
+            save_to_local_file(offset);
             return;
         }
     }
-    std::cout << "[-] Print signature not found." << std::endl;
 }
 
 int main() {
-    // This part requires actual macOS task ports to run
 #ifdef __APPLE__
     task_t task = mach_task_self(); 
-    vm_address_t image_base = (vm_address_t)_get_image_header(0);
-    find_print_offset(task, image_base);
+    vm_address_t base = (vm_address_t)_get_image_header(0);
+    find_print_offset(task, base);
 #else
-    std::cout << "Switch to your Intel Mac to run this scanner." << std::endl;
+    std::cout << "Compile and run this on your Intel Mac." << std::endl;
 #endif
     return 0;
 }
