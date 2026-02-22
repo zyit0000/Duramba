@@ -7,7 +7,7 @@
 #include <vector>
 #include <type_traits>
 #include <algorithm>
-#include <optional> // Added for std::optional and std::nullopt
+#include <optional> // Required for std::optional
 
 namespace memory {
 
@@ -83,11 +83,10 @@ inline std::optional<vm_address_t> read_pointer_chain(
     for (size_t i = 0; i < offsets.size(); ++i) {
         addr += offsets[i];
         
-        // Don't dereference the last offset
         if (i < offsets.size() - 1) {
             vm_address_t next = 0;
             if (!read_value(task, addr, next) || next == 0) {
-                return std::nullopt; // Now works because <optional> is included
+                return std::nullopt; //
             }
             addr = next;
         }
