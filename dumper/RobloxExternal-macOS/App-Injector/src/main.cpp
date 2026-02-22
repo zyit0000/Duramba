@@ -3,8 +3,8 @@
 #include <fstream>
 #include <filesystem>
 #include <cstring>
-#include <sstream>       // Required for std::stringstream (Fixes Error 1)
-#include <mach-o/dyld.h>  // Required for _get_image_header (Fixes Error 2)
+#include <sstream>       
+#include <mach-o/dyld.h>  // FIXED: Added for _dyld_get_image_header
 
 // Project headers
 #include "memory/memory.hpp"
@@ -30,11 +30,11 @@ void save_offset(uintptr_t offset) {
 }
 
 int main() {
-    // Get the base address of the current process image
-    vm_address_t base = (vm_address_t)_get_image_header(0); 
+    // FIXED: Changed _get_image_header to _dyld_get_image_header
+    vm_address_t base = (vm_address_t)_dyld_get_image_header(0); 
     task_t task = mach_task_self();
 
-    // Intel Signature for the function you are looking for
+    // Intel Signature for the function
     const std::vector<uint8_t> sig = { 
         0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53, 0x48, 0x81, 0xEC 
     };
