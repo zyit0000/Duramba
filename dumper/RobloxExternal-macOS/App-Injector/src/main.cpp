@@ -3,8 +3,10 @@
 #include <fstream>
 #include <filesystem>
 #include <cstring>
+#include <sstream>      // Required for std::stringstream
+#include <mach-o/dyld.h> // Required for _get_image_header
 
-// Correct relative paths based on your project structure
+// Project headers using relative paths 
 #include "memory/memory.hpp"
 #include "macho/macho.hpp"
 
@@ -15,11 +17,10 @@ void save_offset(uintptr_t offset) {
     if (!home) return;
 
     fs::path doc_path = fs::path(home) / "Documents" / "offsets.txt";
-    std::string entry = "PRINT_FUNCTION = 0x";
     
     std::stringstream ss;
-    ss << std::hex << offset;
-    entry += ss.str();
+    ss << "PRINT_FUNCTION = 0x" << std::hex << offset;
+    std::string entry = ss.str();
 
     if (fs::exists(doc_path)) {
         std::ifstream infile(doc_path);
@@ -38,8 +39,10 @@ void save_offset(uintptr_t offset) {
 
 int main() {
 #ifdef __APPLE__
-    // Note: You would normally get the task from a PID
+    // Get the task port for the current process
     task_t task = mach_task_self();
+    
+    // Get the image base address for the main executable
     vm_address_t base = (vm_address_t)_get_image_header(0);
 
     // Intel Signature for the Print function
@@ -51,6 +54,7 @@ int main() {
     auto text = macho::get_section(task, base, "__TEXT", "__text");
     if (text) {
         std::vector<uint8_t> buffer(text->size);
+        // Read memory using your memory utility
         if (memory::read_bytes(task, text->address, buffer.data(), text->size)) {
             for (size_t i = 0; i <= buffer.size() - sig.size(); ++i) {
                 if (std::memcmp(&buffer[i], sig.data(), sig.size()) == 0) {
